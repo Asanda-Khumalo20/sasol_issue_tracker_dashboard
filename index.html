@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sasol Rewards – Issue Tracker Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@600;700&display=swap');
+
+  :root {
+    --sasol-blue: #003DA5;
+    --sasol-blue-dark: #002880;
+    --sasol-blue-mid: #0052CC;
+    --sasol-blue-light: #1a6fd4;
+    --sasol-sky: #4A9FE8;
+    --sasol-gold: #F5A623;
+    --white: #ffffff;
+    --glass: rgba(255,255,255,0.08);
+    --glass-border: rgba(255,255,255,0.15);
+    --text-primary: #ffffff;
+    --text-muted: rgba(255,255,255,0.65);
+    --card-bg: rgba(255,255,255,0.07);
+    --surface: rgba(0,40,120,0.6);
+    --danger: #FF4D6D;
+    --warning: #FFAB00;
+    --success: #36B37E;
+    --info: #00B8D9;
+    --shadow: 0 8px 32px rgba(0,0,0,0.35);
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #001A5C 0%, #003DA5 35%, #0052CC 65%, #1565C0 100%);
+    min-height: 100vh;
+    color: var(--text-primary);
+    overflow-x: hidden;
+  }
+
+  /* Animated Background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: 
+      radial-gradient(ellipse 800px 600px at 20% 20%, rgba(74,159,232,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 600px 400px at 80% 80%, rgba(0,82,204,0.2) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ─── TOP NAV ─── */
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(0,29,90,0.92);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--glass-border);
+    padding: 0 28px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 68px; gap: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+  .logo-3d {
+    width: 46px; height: 46px;
+    background: linear-gradient(145deg, #fff 0%, #e0eaff 100%);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 15px rgba(0,61,165,0.4), inset 0 1px 0 rgba(255,255,255,0.8);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px; font-weight: 700;
+    color: var(--sasol-blue); letter-spacing: -0.5px;
+    transform: perspective(200px) rotateY(-8deg);
+  }
+  .brand-text { line-height: 1.15; }
+  .brand-title { font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  .brand-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 1.5px; text-transform: uppercase; }
+
+  .live-clock {
+    font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700;
+    color: var(--sasol-gold); letter-spacing: 2px;
+    display: flex; flex-direction: column; align-items: flex-end;
+  }
+  .live-date { font-size: 11px; font-weight: 400; color: var(--text-muted); letter-spacing: 1px; text-transform: uppercase; margin-top: 1px; }
+
+  /* ─── LAYOUT ─── */
+  .container { position: relative; z-index: 1; padding: 28px 28px 60px; max-width: 1600px; margin: 0 auto; }
+
+  /* ─── CONTROLS ─── */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    background: var(--surface); border: 1px solid var(--glass-border);
+    border-radius: var(--radius); padding: 18px 24px;
+    backdrop-filter: blur(16px); margin-bottom: 28px;
+  }
+  .controls label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; display: block; }
+  .ctrl-group { display: flex; flex-direction: column; min-width: 180px; flex: 1; }
+  .ctrl-input {
+    background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);
+    border-radius: 10px; color: #fff; font-size: 14px; padding: 9px 14px;
+    font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.2s, background 0.2s;
+    width: 100%;
+  }
+  .ctrl-input:focus { border-color: var(--sasol-sky); background: rgba(255,255,255,0.15); }
+  .ctrl-input::placeholder { color: rgba(255,255,255,0.35); }
+  select.ctrl-input option { background: #002880; color: #fff; }
+
+  .btn-upload {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--sasol-gold), #e89500);
+    border: none; border-radius: 10px;
+    color: #002880; font-weight: 700; font-size: 13px;
+    padding: 10px 20px; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+    font-family: 'Inter', sans-serif; letter-spacing: 0.3px; flex-shrink: 0;
+    box-shadow: 0 4px 15px rgba(245,166,35,0.35);
+    margin-top: 18px;
+  }
+  .btn-upload:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(245,166,35,0.5); }
+  .btn-upload svg { width: 16px; height: 16px; }
+
+  .btn-reset {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);
+    border-radius: 10px; color: var(--text-muted); font-size: 13px;
+    padding: 10px 16px; cursor: pointer; transition: all 0.15s;
+    font-family: 'Inter', sans-serif; margin-top: 18px; flex-shrink: 0;
+  }
+  .btn-reset:hover { background: rgba(255,255,255,0.18); color: #fff; }
+
+  /* ─── KPI CARDS ─── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; margin-bottom: 28px; }
+
+  .kpi-card {
+    background: var(--card-bg); border: 1px solid var(--glass-border);
+    border-radius: var(--radius); padding: 24px 22px; position: relative; overflow: hidden;
+    backdrop-filter: blur(16px); transition: transform 0.2s, box-shadow 0.2s;
+    cursor: default;
+  }
+  .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .kpi-card.blue::before { background: linear-gradient(90deg, var(--sasol-blue-light), var(--sasol-sky)); }
+  .kpi-card.gold::before { background: linear-gradient(90deg, var(--sasol-gold), #ffcd6b); }
+  .kpi-card.danger::before { background: linear-gradient(90deg, var(--danger), #ff8fa3); }
+  .kpi-card.success::before { background: linear-gradient(90deg, var(--success), #79f2c0); }
+  .kpi-card.info::before { background: linear-gradient(90deg, var(--info), #79e8f5); }
+  .kpi-card.purple::before { background: linear-gradient(90deg, #a855f7, #d8b4fe); }
+
+  .kpi-icon {
+    width: 42px; height: 42px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px; font-size: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  .kpi-icon.blue { background: linear-gradient(135deg, var(--sasol-blue-light), var(--sasol-sky)); }
+  .kpi-icon.gold { background: linear-gradient(135deg, var(--sasol-gold), #e89500); }
+  .kpi-icon.danger { background: linear-gradient(135deg, var(--danger), #ff8fa3); }
+  .kpi-icon.success { background: linear-gradient(135deg, var(--success), #79f2c0); }
+  .kpi-icon.info { background: linear-gradient(135deg, var(--info), #79e8f5); }
+  .kpi-icon.purple { background: linear-gradient(135deg, #a855f7, #d8b4fe); }
+
+  .kpi-value { font-family: 'Rajdhani', sans-serif; font-size: 42px; font-weight: 700; line-height: 1; margin-bottom: 6px; }
+  .kpi-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 500; }
+
+  /* ─── GRID ─── */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .charts-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+
+  .card {
+    background: var(--card-bg); border: 1px solid var(--glass-border);
+    border-radius: var(--radius); padding: 24px; backdrop-filter: blur(16px);
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px;
+    display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,0.9);
+  }
+  .card-title span { font-size: 16px; }
+
+  .chart-wrap { position: relative; height: 240px; }
+  .chart-wrap-sm { position: relative; height: 200px; }
+
+  /* ─── ISSUE TABLE ─── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: rgba(0,61,165,0.5); color: var(--sasol-gold);
+    font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; padding: 12px 14px;
+    text-align: left; white-space: nowrap; position: sticky; top: 0;
+    border-bottom: 1px solid var(--glass-border);
+  }
+  tbody tr { border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.15s; }
+  tbody tr:hover { background: rgba(255,255,255,0.05); }
+  tbody td { padding: 12px 14px; color: rgba(255,255,255,0.88); vertical-align: top; }
+  .desc-cell { max-width: 380px; }
+  .desc-text { max-height: 56px; overflow: hidden; line-height: 1.5; position: relative; }
+  .desc-text.expanded { max-height: none; }
+  .expand-btn {
+    background: none; border: none; color: var(--sasol-sky);
+    font-size: 11px; cursor: pointer; padding: 2px 0; font-family: 'Inter', sans-serif;
+  }
+  .expand-btn:hover { text-decoration: underline; }
+
+  /* Badges */
+  .badge {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px; white-space: nowrap;
+  }
+  .badge-gp { background: rgba(74,159,232,0.2); color: #7ec8f8; border: 1px solid rgba(74,159,232,0.3); }
+  .badge-ac { background: rgba(165,85,247,0.2); color: #d8b4fe; border: 1px solid rgba(165,85,247,0.3); }
+  .badge-fb { background: rgba(24,119,242,0.2); color: #7eb3f8; border: 1px solid rgba(24,119,242,0.35); }
+  .badge-other { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.15); }
+
+  .issue-chip {
+    display: inline-block; font-size: 11px; font-weight: 500;
+    padding: 3px 9px; border-radius: 6px; max-width: 200px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    background: rgba(245,166,35,0.12); color: #ffd96a; border: 1px solid rgba(245,166,35,0.25);
+  }
+
+  /* ─── RESULT COUNT ─── */
+  .result-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; flex-wrap: wrap; gap: 8px;
+  }
+  .result-count { font-size: 13px; color: var(--text-muted); }
+  .result-count strong { color: var(--sasol-gold); font-size: 15px; }
+
+  /* ─── EMPTY STATE ─── */
+  .empty-state {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state .big-icon { font-size: 52px; margin-bottom: 16px; }
+  .empty-state h3 { font-family: 'Rajdhani', sans-serif; font-size: 22px; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  /* ─── SECTION HEADER ─── */
+  .section-hdr {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 2px; color: var(--sasol-gold);
+    margin-bottom: 16px; padding-bottom: 10px;
+    border-bottom: 1px solid rgba(245,166,35,0.2);
+  }
+  .section-hdr::after { content: ''; flex: 1; height: 1px; background: rgba(245,166,35,0.15); }
+
+  /* ─── PLATFORM PILLS ─── */
+  .platform-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .pill {
+    padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.15s; user-select: none;
+    border: 1px solid transparent;
+  }
+  .pill.active, .pill:hover { transform: scale(1.03); }
+  .pill-all { background: rgba(74,159,232,0.15); color: #7ec8f8; border-color: rgba(74,159,232,0.3); }
+  .pill-all.active { background: var(--sasol-sky); color: #fff; border-color: var(--sasol-sky); }
+  .pill-google { background: rgba(52,168,83,0.12); color: #86efac; border-color: rgba(52,168,83,0.25); }
+  .pill-google.active { background: #34a853; color: #fff; border-color: #34a853; }
+  .pill-apple { background: rgba(165,85,247,0.12); color: #d8b4fe; border-color: rgba(165,85,247,0.25); }
+  .pill-apple.active { background: #a855f7; color: #fff; border-color: #a855f7; }
+  .pill-fb { background: rgba(24,119,242,0.12); color: #93c5fd; border-color: rgba(24,119,242,0.25); }
+  .pill-fb.active { background: #1877f2; color: #fff; border-color: #1877f2; }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes countUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  .fade-in { animation: fadeIn 0.5s ease both; }
+  .kpi-value { animation: countUp 0.6s ease both; }
+
+  .live-dot {
+    width: 8px; height: 8px; background: #36B37E; border-radius: 50%;
+    display: inline-block; margin-right: 6px;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+
+  @media (max-width: 900px) {
+    .charts-grid, .charts-grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<header class="topbar">
+  <div class="brand">
+    <div class="logo-3d">SASOL</div>
+    <div class="brand-text">
+      <div class="brand-title">Sasol Rewards</div>
+      <div class="brand-sub">Social Media &amp; App Store Issue Tracker</div>
+    </div>
+  </div>
+  <div class="live-clock">
+    <div id="clock">--:--:--</div>
+    <div class="live-date" id="dateStr">Loading...</div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="container">
+
+  <!-- CONTROLS -->
+  <div class="controls fade-in">
+    <div class="ctrl-group">
+      <label>🔍 Search Issues</label>
+      <input type="text" class="ctrl-input" id="searchInput" placeholder="Search complainant, issue, description…"/>
+    </div>
+    <div class="ctrl-group">
+      <label>📋 Source Sheet</label>
+      <select class="ctrl-input" id="sheetFilter">
+        <option value="all">All Sources</option>
+        <option value="app">App Store</option>
+        <option value="social">Social Media</option>
+      </select>
+    </div>
+    <div class="ctrl-group">
+      <label>🏷️ Issue Category</label>
+      <select class="ctrl-input" id="issueFilter">
+        <option value="all">All Issues</option>
+      </select>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+      <label style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">📂 Load Excel File</label>
+      <div style="display:flex;gap:8px;">
+        <label class="btn-upload" for="fileInput">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Upload New Excel
+        </label>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none"/>
+        <button class="btn-reset" id="resetBtn">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLATFORM PILLS -->
+  <div class="platform-row fade-in">
+    <span class="pill pill-all active" data-platform="all">All Platforms</span>
+    <span class="pill pill-google" data-platform="google">📱 Google Play</span>
+    <span class="pill pill-apple" data-platform="apple">🍎 Apple</span>
+    <span class="pill pill-fb" data-platform="fb">👥 Facebook</span>
+  </div>
+
+  <!-- KPI CARDS -->
+  <div class="kpi-grid" id="kpiGrid">
+    <!-- filled by JS -->
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="charts-grid">
+    <div class="card fade-in">
+      <div class="card-title"><span>📊</span> Issues by Platform</div>
+      <div class="chart-wrap"><canvas id="platformChart"></canvas></div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title"><span>🔥</span> Top Issue Categories</div>
+      <div class="chart-wrap"><canvas id="issueChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 2 -->
+  <div class="charts-grid-3">
+    <div class="card fade-in">
+      <div class="card-title"><span>📡</span> Source Breakdown</div>
+      <div class="chart-wrap-sm"><canvas id="sourceChart"></canvas></div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title"><span>⚡</span> Issue Severity Map</div>
+      <div class="chart-wrap-sm"><canvas id="severityChart"></canvas></div>
+    </div>
+    <div class="card fade-in">
+      <div class="card-title"><span>📈</span> Platform Share</div>
+      <div class="chart-wrap-sm"><canvas id="shareChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ISSUES TABLE -->
+  <div class="card fade-in">
+    <div class="section-hdr">📋 Issue Log</div>
+    <div class="result-bar">
+      <div class="result-count"><span class="live-dot"></span>Live Feed · <strong id="resultCount">0</strong> issues displayed</div>
+      <div style="font-size:12px;color:var(--text-muted);">Click ▼ to expand descriptions</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Complainant</th>
+            <th>Platform</th>
+            <th>Issue</th>
+            <th>Description</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="issueTable"></tbody>
+      </table>
+    </div>
+    <div id="emptyState" class="empty-state" style="display:none">
+      <div class="big-icon">🔍</div>
+      <h3>No Issues Found</h3>
+      <p>Try adjusting your search or filters,<br/>or upload a new Excel file above.</p>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── EMBEDDED DATA ───
+const EMBEDDED = {
+  "Sasol App Store Issue tracker": [
+    {"Complainant":"Richard Pule","Platform":"Google Play","Issue":"No Feedback on case","Issue description":"I opened the case through the app and got no respond nor any feedback on queries I had. The worse part is that the cases were all closed without any explanation."},
+    {"Complainant":"Tebogo Kgomanyane","Platform":"Google Play Console","Issue":"Bad customer service","Issue description":"Your call center offered me a bad service. they are useless and incompetent"},
+    {"Complainant":"Barend Blom","Platform":"Google Play Console","Issue":"Scammed with bad call center assistance","Issue description":"scammers hacked my app and since December 2025 NO-ONE at Sasol helped me get all my rewards back. NO FEEDBACK on how it happens or solution. I made numerous calls to call centres they never call back or my demand for managers to call me."},
+    {"Complainant":"Wicus Le Grange","Platform":"Google Play","Issue":"Bad customer service","Issue description":"Terrible app, tried to register several times, contacted your support SRW0010093 and SRW0013495 and SRW0013519, no response, seems you are not interested in new business"},
+    {"Complainant":"Leroy Shane Dreyer","Platform":"Google Play","Issue":"Poor customer service","Issue description":"i tried to change my cell number of my rewards card. I still didn't get no feedback via email or via phone. I tried the rewards dial number, been on hold for nearly an hour and when I call them back they drop the call"},
+    {"Complainant":"Chantelle Prinsloo","Platform":"Google Play","Issue":"Several issues","Issue description":"Numerous issues that just stays unresolved. They phone me back but they never solve the issue and refuses to delete my details from the system that will allow me to create a new account and therefore a digital card."},
+    {"Complainant":"Thato Modisakeng","Platform":"Google Play","Issue":"Can't log in","Issue description":"Stopped working.... the app was fine then all of a sudden started loading for a long time till it sends a error message. I deleted and downloaded again still can't open. I can't see my points"},
+    {"Complainant":"Abdullah Varachia","Platform":"Google Play","Issue":"Can't log in","Issue description":"won't let me log in since I bought a new phone guess il have to change garages"},
+    {"Complainant":"Gerhard Labuschagne","Platform":"Google Play","Issue":"Can't log in","Issue description":"Most of the time I can't log in. Tried with Firefox and Chrome as my default browser and made sure Javascript is allowed. Very unreliable. Proudly South African low standards."},
+    {"Complainant":"Frans De Klerk","Platform":"Google Play","Issue":"App stopped working","Issue description":"all of a sudden my app is not working"},
+    {"Complainant":"Thabo Masuku","Platform":"Google Play","Issue":"App doesn't work","Issue description":"The app doesn't work in my Samsung A54, keeps saying no network"},
+    {"Complainant":"Eugene","Platform":"Apple Connect","Issue":"Poor Customer Service","Issue description":"How do you close a query with no feedback or correction, what is the point of the service if you do not resolve issues."},
+    {"Complainant":"Voetsek1","Platform":"Apple Connect","Issue":"Poor Customer Service","Issue description":"I made 3 phone calls today and all calls were cut!"},
+    {"Complainant":"gU","Platform":"Apple Connect","Issue":"Poor customer service","Issue description":"Consultants assisting with the details amendment are not doing what they are supposed to be doing."},
+    {"Complainant":"Whatever@113","Platform":"Apple Connect","Issue":"POOR CUSTOMER SERVICE","Issue description":"Call centre never changes that number while we lose points"},
+    {"Complainant":"MSMosea","Platform":"Apple Connect","Issue":"Scammed","Issue description":"This program protection system is terrible. Scammers always use my card even when I have it with me"},
+    {"Complainant":"Kwagga05","Platform":"Apple Connect","Issue":"Nobody to help change number","Issue description":"I've been trying to update my contact details for 4 months now no one is helping every time they say they will make it a priority but they never come to light"},
+    {"Complainant":"Lilac-Blue","Platform":"Apple Connect","Issue":"Feedback on July complaint","Issue description":"I cant find the feedback mail she says is attached regarding my complaint?!"},
+    {"Complainant":"Doctor Cornelius Nkosi","Platform":"Google Play","Issue":"Can't download virtual card","Issue description":"can't download virtual card"},
+    {"Complainant":"Gerhard Labuschagne","Platform":"Google Play","Issue":"Can't log in","Issue description":"Most of the time I can't log in. Tried with Firefox and Chrome. Very unreliable."},
+    {"Complainant":"Abdullah Varachia","Platform":"Google Play","Issue":"Can't log in","Issue description":"won't let me log in since I bought a new phone."},
+    {"Complainant":"James Grove","Platform":"Other","Issue":"Voucher Redemption Dispute","Issue description":"The customer's husband attempted to redeem a R200 voucher at a Spur outlet. However, the merchant's system indicated that the voucher had already been redeemed. The customer maintains that they have not used the voucher and is requesting an immediate fix."},
+    {"Complainant":"Thabiso Motshegwa","Platform":"Google Play Store","Issue":"Terrible Customer Service","Issue description":"Terrible service. Call center consultant dropped the call on my ear after waiting 4 weeks to get feedback regarding a Spur voucher which does not work at Spur, and my points are gone from the rewards app."},
+    {"Complainant":"Wicus Le Grange","Platform":"Google Play Store","Issue":"No customer support response","Issue description":"Terrible app, tried to register several times, contacted your support SRW0010093 and SRW0013495 and SRW0013519, no response, seems you are not interested in new business"}
+  ],
+  "Sasol SocialMedia Issue tracker": [
+    {"Complainant":"Ragmat Baron","Platform":"Facebook","Issue":"Prize not received - Magpie Competition","Issue description":"Good day Team Sasol I won a competition in December but have not received my prize yet please assist by following up for me. (1 of 100 Fuel vouchers to the value of R1500 in the Sasol Delight Magpie competition, powered by the Sasol Rewards Programme.)"},
+    {"Complainant":"Jayesh Ravjee","Platform":"Facebook","Issue":"Spur Father's Day promotion dispute","Issue description":"I am writing to express my strong dissatisfaction with my recent experience regarding the Sasol Rewards Spur Father's Day promotion. I saved my points specifically to redeem the Spur voucher via the Sasol Rewards App, which promised an additional R50 bonus voucher. The consultant explicitly assured me that the bonus would automatically apply at the restaurant when I redeemed the main voucher. Last night, my family and I visited Spur. The R50 bonus could not be applied. I feel misled into redeeming my hard-earned points under false pretences."},
+    {"Complainant":"Faith Tshuma","Platform":"Facebook","Issue":"Blue voucher query","Issue description":"Someone sell me a blue voucher without voucher number. In your N1 shop. NYDAH RADEBE SAVED ME A SLIP OF VOUCHER WITHOUT VOUCHER NUMBER. I WAS IN THE BUS"}
+  ]
+};
+
+// ─── STATE ───
+let allData = [];
+let charts = {};
+let activePlatform = 'all';
+
+// ─── CLOCK ───
+function updateClock() {
+  const now = new Date();
+  const t = now.toLocaleTimeString('en-ZA', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const d = now.toLocaleDateString('en-ZA', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('clock').textContent = t;
+  document.getElementById('dateStr').textContent = d;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── LOAD DATA ───
+function normalise(sheetName, records) {
+  return records.map(r => ({
+    complainant: (r['Complainant'] || r['complainant'] || '').trim(),
+    platform: normPlatform((r['Platform'] || r['platform'] || '').trim()),
+    issue: (r['Issue'] || r['issue'] || '').trim(),
+    description: (r['Issue description'] || r['Issue Description'] || r['description'] || '').trim(),
+    source: sheetName.includes('Social') ? 'Social Media' : 'App Store'
+  }));
+}
+
+function normPlatform(p) {
+  const l = p.toLowerCase();
+  if (l.includes('google')) return 'Google Play';
+  if (l.includes('apple') || l.includes('ios')) return 'Apple Connect';
+  if (l.includes('facebook') || l.includes('fb')) return 'Facebook';
+  return p || 'Other';
+}
+
+function normIssue(issue) {
+  const l = issue.toLowerCase();
+  if (l.includes('log in') || l.includes('login') || l.includes("can't log")) return "Can't Log In";
+  if (l.includes('customer service') || l.includes('call center') || l.includes('call centre') || l.includes('poor') || l.includes('bad') || l.includes('terrible')) return 'Poor Customer Service';
+  if (l.includes('scam') || l.includes('hacked') || l.includes('compromised')) return 'Scam / Security Issue';
+  if (l.includes('feedback') || l.includes('no response') || l.includes('no support')) return 'No Feedback / Response';
+  if (l.includes('voucher')) return 'Voucher Issue';
+  if (l.includes('app') || l.includes('work') || l.includes('download') || l.includes('virtual card')) return 'App Technical Issue';
+  if (l.includes('number') || l.includes('details') || l.includes('amendment')) return 'Account / Details Update';
+  if (l.includes('points') || l.includes('rewards') || l.includes('competition') || l.includes('prize')) return 'Rewards / Points Issue';
+  return 'Other';
+}
+
+function loadEmbedded() {
+  allData = [];
+  for (const [sheet, rows] of Object.entries(EMBEDDED)) {
+    allData.push(...normalise(sheet, rows));
+  }
+  allData.forEach(d => { d.category = normIssue(d.issue); });
+  render();
+}
+
+// ─── EXCEL UPLOAD ───
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const wb = XLSX.read(ev.target.result, {type:'binary'});
+    allData = [];
+    wb.SheetNames.forEach(sheetName => {
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      allData.push(...normalise(sheetName, rows));
+    });
+    allData.forEach(d => { d.category = normIssue(d.issue); });
+    populateIssueFilter();
+    render();
+  };
+  reader.readAsBinaryString(file);
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('sheetFilter').value = 'all';
+  document.getElementById('issueFilter').value = 'all';
+  activePlatform = 'all';
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  document.querySelector('.pill-all').classList.add('active');
+  render();
+});
+
+// ─── PLATFORM PILLS ───
+document.querySelectorAll('.pill').forEach(pill => {
+  pill.addEventListener('click', function() {
+    activePlatform = this.dataset.platform;
+    document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+    this.classList.add('active');
+    render();
+  });
+});
+
+// ─── FILTERS ───
+document.getElementById('searchInput').addEventListener('input', render);
+document.getElementById('sheetFilter').addEventListener('change', render);
+document.getElementById('issueFilter').addEventListener('change', render);
+
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const sheet = document.getElementById('sheetFilter').value;
+  const issue = document.getElementById('issueFilter').value;
+  return allData.filter(d => {
+    if (sheet === 'app' && d.source !== 'App Store') return false;
+    if (sheet === 'social' && d.source !== 'Social Media') return false;
+    if (issue !== 'all' && d.category !== issue) return false;
+    if (activePlatform !== 'all') {
+      if (activePlatform === 'google' && !d.platform.toLowerCase().includes('google')) return false;
+      if (activePlatform === 'apple' && !d.platform.toLowerCase().includes('apple')) return false;
+      if (activePlatform === 'fb' && !d.platform.toLowerCase().includes('facebook')) return false;
+    }
+    if (q) {
+      const haystack = `${d.complainant} ${d.issue} ${d.description} ${d.platform}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function populateIssueFilter() {
+  const cats = [...new Set(allData.map(d => d.category))].sort();
+  const sel = document.getElementById('issueFilter');
+  sel.innerHTML = '<option value="all">All Issues</option>';
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+}
+
+// ─── PLATFORM BADGE ───
+function platformBadge(p) {
+  const l = p.toLowerCase();
+  if (l.includes('google')) return `<span class="badge badge-gp">📱 ${p}</span>`;
+  if (l.includes('apple')) return `<span class="badge badge-ac">🍎 ${p}</span>`;
+  if (l.includes('facebook')) return `<span class="badge badge-fb">👥 ${p}</span>`;
+  return `<span class="badge badge-other">${p || 'Unknown'}</span>`;
+}
+
+// ─── RENDER KPIs ───
+function renderKPIs(data) {
+  const total = data.length;
+  const appCount = data.filter(d => d.source === 'App Store').length;
+  const socialCount = data.filter(d => d.source === 'Social Media').length;
+  const googleCount = data.filter(d => d.platform.includes('Google')).length;
+  const appleCount = data.filter(d => d.platform.includes('Apple')).length;
+  const serviceIssues = data.filter(d => d.category === 'Poor Customer Service').length;
+
+  const kpis = [
+    { icon: '📋', label: 'Total Issues', value: total, cls: 'blue' },
+    { icon: '📱', label: 'App Store Issues', value: appCount, cls: 'info' },
+    { icon: '👥', label: 'Social Media Issues', value: socialCount, cls: 'purple' },
+    { icon: '🤖', label: 'Google Play', value: googleCount, cls: 'success' },
+    { icon: '🍎', label: 'Apple Connect', value: appleCount, cls: 'gold' },
+    { icon: '🚨', label: 'Service Complaints', value: serviceIssues, cls: 'danger' },
+  ];
+
+  document.getElementById('kpiGrid').innerHTML = kpis.map(k => `
+    <div class="kpi-card ${k.cls}">
+      <div class="kpi-icon ${k.cls}">${k.icon}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-label">${k.label}</div>
+    </div>`).join('');
+}
+
+// ─── CHART HELPERS ───
+const COLORS = ['#4A9FE8','#F5A623','#FF4D6D','#36B37E','#A855F7','#00B8D9','#FFAB00','#FB923C','#34D399','#F472B6'];
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderCharts(data) {
+  // Platform bar
+  destroyChart('platform');
+  const platMap = {};
+  data.forEach(d => { platMap[d.platform] = (platMap[d.platform]||0)+1; });
+  const platLabels = Object.keys(platMap);
+  const platVals = Object.values(platMap);
+
+  charts['platform'] = new Chart(document.getElementById('platformChart'), {
+    type: 'bar',
+    data: {
+      labels: platLabels,
+      datasets: [{ data: platVals, backgroundColor: COLORS.slice(0, platLabels.length),
+        borderRadius: 8, borderSkipped: false }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: 'rgba(255,255,255,0.7)', font:{size:11} }, grid: { display: false } },
+        y: { ticks: { color: 'rgba(255,255,255,0.6)', font:{size:11} }, grid: { color: 'rgba(255,255,255,0.05)' } }
+      },
+      responsive: true, maintainAspectRatio: false
+    }
+  });
+
+  // Top Issues horizontal bar
+  destroyChart('issue');
+  const issMap = {};
+  data.forEach(d => { issMap[d.category] = (issMap[d.category]||0)+1; });
+  const sorted = Object.entries(issMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  charts['issue'] = new Chart(document.getElementById('issueChart'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(s=>s[0]),
+      datasets: [{ data: sorted.map(s=>s[1]), backgroundColor: COLORS,
+        borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: 'rgba(255,255,255,0.6)', font:{size:11} }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: 'rgba(255,255,255,0.8)', font:{size:11} }, grid: { display: false } }
+      },
+      responsive: true, maintainAspectRatio: false
+    }
+  });
+
+  // Source doughnut
+  destroyChart('source');
+  const appC = data.filter(d=>d.source==='App Store').length;
+  const socC = data.filter(d=>d.source==='Social Media').length;
+  charts['source'] = new Chart(document.getElementById('sourceChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['App Store','Social Media'],
+      datasets: [{ data: [appC, socC], backgroundColor: ['#4A9FE8','#A855F7'],
+        borderColor: 'rgba(0,40,120,0.8)', borderWidth: 3, hoverOffset: 8 }]
+    },
+    options: {
+      plugins: { legend: { labels: { color: 'rgba(255,255,255,0.8)', font:{size:12} } } },
+      cutout: '65%', responsive: true, maintainAspectRatio: false
+    }
+  });
+
+  // Severity radar-like polar
+  destroyChart('severity');
+  const sevCats = ['Poor CX','No Feedback','App Issue','Scam/Security','Voucher Issue','Account Update'];
+  const sevMap = { 'Poor Customer Service':'Poor CX', 'No Feedback / Response':'No Feedback',
+    'App Technical Issue':'App Issue', 'Scam / Security Issue':'Scam/Security',
+    'Voucher Issue':'Voucher Issue', "Account / Details Update":'Account Update' };
+  const sevData = sevCats.map(cat => {
+    const key = Object.entries(sevMap).find(([,v])=>v===cat)?.[0] || cat;
+    return data.filter(d=>d.category===key).length;
+  });
+  charts['severity'] = new Chart(document.getElementById('severityChart'), {
+    type: 'polarArea',
+    data: {
+      labels: sevCats,
+      datasets: [{ data: sevData, backgroundColor: COLORS.slice(0,6).map(c=>c+'AA'),
+        borderColor: COLORS.slice(0,6), borderWidth: 2 }]
+    },
+    options: {
+      plugins: { legend: { labels: { color: 'rgba(255,255,255,0.75)', font:{size:10} } } },
+      scales: { r: { ticks: { display: false }, grid: { color: 'rgba(255,255,255,0.08)' } } },
+      responsive: true, maintainAspectRatio: false
+    }
+  });
+
+  // Platform pie
+  destroyChart('share');
+  charts['share'] = new Chart(document.getElementById('shareChart'), {
+    type: 'pie',
+    data: {
+      labels: platLabels,
+      datasets: [{ data: platVals, backgroundColor: COLORS.slice(0, platLabels.length),
+        borderColor: 'rgba(0,40,120,0.8)', borderWidth: 2, hoverOffset: 8 }]
+    },
+    options: {
+      plugins: { legend: { labels: { color: 'rgba(255,255,255,0.8)', font:{size:11} } } },
+      responsive: true, maintainAspectRatio: false
+    }
+  });
+}
+
+// ─── RENDER TABLE ───
+function renderTable(data) {
+  const tbody = document.getElementById('issueTable');
+  const empty = document.getElementById('emptyState');
+  document.getElementById('resultCount').textContent = data.length;
+
+  if (data.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = data.map((d, i) => {
+    const id = `desc-${i}`;
+    const desc = d.description.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<tr>
+      <td style="color:var(--text-muted);font-size:12px;">${i+1}</td>
+      <td><strong style="font-size:13px;">${d.complainant || '—'}</strong></td>
+      <td>${platformBadge(d.platform)}</td>
+      <td><span class="issue-chip" title="${d.issue}">${d.category}</span></td>
+      <td class="desc-cell">
+        <div class="desc-text" id="${id}">${desc}</div>
+        <button class="expand-btn" onclick="toggleDesc('${id}',this)">▼ Show more</button>
+      </td>
+      <td><span style="font-size:11px;color:var(--text-muted);">${d.source}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleDesc(id, btn) {
+  const el = document.getElementById(id);
+  if (el.classList.contains('expanded')) {
+    el.classList.remove('expanded'); btn.textContent = '▼ Show more';
+  } else {
+    el.classList.add('expanded'); btn.textContent = '▲ Show less';
+  }
+}
+
+// ─── MAIN RENDER ───
+function render() {
+  const data = getFiltered();
+  renderKPIs(data);
+  renderCharts(data);
+  renderTable(data);
+}
+
+// ─── INIT ───
+loadEmbedded();
+populateIssueFilter();
+</script>
+</body>
+</html>
